@@ -1,60 +1,54 @@
 import "babel-polyfill";
 import Chart from "chart.js";
 
-const currencyURL = "www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
-// const meteoURL = "/xml.meteoservice.ru/export/gismeteo/point/140.xml";
-
-async function loadCurrency() {
-  const response = await fetch(currencyURL);
-  const xmlTest = await response.text();
-  const parser = new DOMParser();
-  const currencyData = parser.parseFromString(xmlTest, "text/xml");
-  // <Cube currency="USD" rate="1.1321" />
-  const rates = currencyData.querySelectorAll("Cube[currency][rate]");
-  const result = Object.create(null);
-  for (let i = 0; i < rates.length; i++) {
-    const rateTag = rates.item(i);
-    const rate = rateTag.getAttribute("rate");
-    const currency = rateTag.getAttribute("currency");
-    result[currency] = rate;
-  }
-  result["EUR"] = 1;
-  // result["RANDOM"] = 1 + Math.random();
-  return result;
-}
-
-function normalizeDataByCurrency(data, currency) {
-  const result = Object.create(null);
-  const value = data[currency];
-  for (const key of Object.keys(data)) {
-    result[key] = value / data[key];
-  }
-  return result;
-}
+const meteoURL = "/xml.meteoservice.ru/export/gismeteo/point/140.xml";
 
 const buttonBuild = document.getElementById("btn");
 const canvasCtx = document.getElementById("out").getContext("2d");
-buttonBuild.addEventListener("click", async function() {
-  const currencyData = await loadCurrency();
-  const normalData = normalizeDataByCurrency(currencyData, "RUB");
-  const keys = Object.keys(normalData).sort((k1, k2) =>
-    compare(normalData[k1], normalData[k2])
-  );
-  const plotData = keys.map(key => normalData[key]);
 
+buttonBuild.addEventListener("click", async function() {
+  const response = await fetch (meteoURL);
+  const xmlTest = await response.text();
+
+  const parser = new DOMParser();
+  const meteoData = parser.parseFromString(xmlTest, "text/xml");
+
+  var labels_x = [];
+  var arrMax = [];
+  var arrMin = [];
+
+  var forecastList = meteoData.getElementsByTagName("FORECAST");
+  for (var i=0; i<forecastList.length; i++) {
+    labels_x[i] = forecastList[i].getAttribute("day") + '.' + forecastList[i].getAttribute("month") + ' '+ forecastList[i].getAttribute("hour") + ':00';
+    var temprElem = forecastList[i].getElementsByTagName("TEMPERATURE");
+    arrMin[i] = temprElem[0].getAttribute("min");
+    arrMax[i] = temprElem[0].getAttribute("max");
+  }
+  
+
+  var dataMin = {
+    label: "Min",
+    data: arrMin,
+    lineTension: 0.3,
+    borderColor: ['rgba(0, 99, 132, 1)'],
+    backgroundColor: ['rgba(0, 99, 132, 0)']
+  };
+     
+  var dataMax = {
+    label: "Max",
+    data: arrMax,
+    borderColor: ['rgba(240, 99, 132, 1)'],
+    backgroundColor: ['rgba(240, 99, 132, 0)']
+    // Set More Options
+  };
+  
+  
   const chartConfig = {
     type: "line",
 
     data: {
-      labels: keys,
-      datasets: [
-        {
-          label: "Стоимость валюты в рублях",
-          backgroundColor: "rgb(255, 20, 20)",
-          borderColor: "rgb(180, 0, 0)",
-          data: plotData
-        }
-      ]
+      labels: labels_x,
+      datasets: [dataMin, dataMax]
     }
   };
 
@@ -69,9 +63,3 @@ buttonBuild.addEventListener("click", async function() {
     window.chart = new Chart(canvasCtx, chartConfig);
   }
 });
-
-function compare(a, b) {
-  if (a > b) return 1;
-  if (a < b) return -1;
-  return 0;
-}
